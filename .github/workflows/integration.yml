@@ -45,7 +45,15 @@ jobs:
           chmod +x /tmp/openscad.AppImage
           ( cd /tmp && ./openscad.AppImage --appimage-extract >/dev/null )
           sudo mv /tmp/squashfs-root /opt/openscad
-          sudo ln -sf /opt/openscad/AppRun /usr/local/bin/openscad
+          # AppRun uses `dirname "$0"` (no readlink -f) to locate its
+          # apprun-hooks sibling dir, so a symlink would make it look for
+          # hooks in /usr/local/bin. Wrap it with an absolute-path exec
+          # script instead.
+          sudo tee /usr/local/bin/openscad >/dev/null <<'WRAPPER'
+          #!/bin/sh
+          exec /opt/openscad/AppRun "$@"
+          WRAPPER
+          sudo chmod +x /usr/local/bin/openscad
           openscad --version
 
       - name: Set up uv
