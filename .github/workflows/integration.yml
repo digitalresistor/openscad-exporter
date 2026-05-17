@@ -1,0 +1,38 @@
+name: Integration tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    name: End-to-end with OpenSCAD
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenSCAD (development snapshot)
+        run: |
+          sudo snap install openscad-nightly
+          sudo ln -sf /snap/bin/openscad-nightly /usr/local/bin/openscad
+          openscad --version
+
+      - name: Install xvfb for headless rendering
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Run integration tests
+        run: xvfb-run -a uv run tox -e integration -- -v
