@@ -23,6 +23,7 @@ _KNOWN_PATHS_LINUX = (
     "/usr/bin/openscad",
     "/usr/local/bin/openscad",
     "/snap/bin/openscad",
+    "/snap/bin/openscad-nightly",
 )
 _KNOWN_PATHS_WINDOWS = (
     r"C:\Program Files\OpenSCAD\openscad.exe",

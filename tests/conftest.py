@@ -85,15 +85,24 @@ def isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # monkeypatch handles teardown
 
 
+_FALLBACK_OPENSCAD_PATHS = (
+    "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD",
+    "/snap/bin/openscad-nightly",
+    "/snap/bin/openscad",
+)
+
+
 def _ensure_openscad_available() -> str | None:
     """Return path to a real openscad binary if present, else None."""
     import shutil
 
-    return shutil.which("openscad") or (
-        "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
-        if os.path.isfile("/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD")
-        else None
-    )
+    found = shutil.which("openscad")
+    if found:
+        return found
+    for path in _FALLBACK_OPENSCAD_PATHS:
+        if os.path.isfile(path):
+            return path
+    return None
 
 
 @pytest.fixture

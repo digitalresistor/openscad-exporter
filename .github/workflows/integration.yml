@@ -17,44 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install system dependencies
+      - name: Install OpenSCAD (development snapshot via snap)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            curl wget xvfb \
-            libgl1 libegl1 libglx0 \
-            libxkbcommon0 libxkbcommon-x11-0 \
-            libdbus-1-3 libfontconfig1 libxrender1 \
-            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
-            libxcb-shape0 libxcb-sync1 libxcb-xfixes0 \
-            libxcb-xinerama0 libxcb-xkb1
-
-      - name: Install OpenSCAD (development snapshot AppImage)
-        run: |
-          # Discover the newest x86_64 AppImage from the snapshots index so we
-          # don't have to chase URL rotations. Extract it instead of running
-          # via FUSE so we don't need libfuse2 on the runner.
-          LISTING=$(curl -sSL https://files.openscad.org/snapshots/)
-          LATEST=$(printf '%s\n' "$LISTING" \
-            | grep -oE 'OpenSCAD-[0-9.]+\.ai[0-9]+-x86_64\.AppImage' \
-            | sort -u | tail -1)
-          test -n "$LATEST" || { echo "No snapshot AppImage found"; exit 1; }
-          echo "Using $LATEST"
-          wget -q "https://files.openscad.org/snapshots/${LATEST}" -O /tmp/openscad.AppImage
-          chmod +x /tmp/openscad.AppImage
-          ( cd /tmp && ./openscad.AppImage --appimage-extract >/dev/null )
-          sudo mv /tmp/squashfs-root /opt/openscad
-          # AppRun uses `dirname "$0"` (no readlink -f) to locate its
-          # apprun-hooks sibling dir, so a symlink would make it look for
-          # hooks in /usr/local/bin. Wrap it with an absolute-path exec
-          # script instead.
-          sudo tee /usr/local/bin/openscad >/dev/null <<'WRAPPER'
-          #!/bin/sh
-          exec /opt/openscad/AppRun "$@"
-          WRAPPER
-          sudo chmod +x /usr/local/bin/openscad
-          openscad --version
+          sudo snap install openscad-nightly
+          /snap/bin/openscad-nightly --version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -62,5 +28,10 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
+      # The openscad-nightly snap is strict-confined: it gets a private view
+      # of /tmp, so pytest's default basetemp (under /tmp) is invisible to it.
+      # Point TMPDIR at a path under $HOME, which the snap home plug exposes.
       - name: Run integration tests
-        run: xvfb-run -a uv run tox -e integration -- -v
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: uv run tox -e integration -- -v
