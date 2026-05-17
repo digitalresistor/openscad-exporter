@@ -17,16 +17,36 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install OpenSCAD (development snapshot)
-        run: |
-          sudo snap install openscad-nightly
-          sudo ln -sf /snap/bin/openscad-nightly /usr/local/bin/openscad
-          openscad --version
-
-      - name: Install xvfb for headless rendering
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb
+          sudo apt-get install -y --no-install-recommends \
+            curl wget xvfb \
+            libgl1 libegl1 libglx0 \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libdbus-1-3 libfontconfig1 libxrender1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-sync1 libxcb-xfixes0 \
+            libxcb-xinerama0 libxcb-xkb1
+
+      - name: Install OpenSCAD (development snapshot AppImage)
+        run: |
+          # Discover the newest x86_64 AppImage from the snapshots index so we
+          # don't have to chase URL rotations. Extract it instead of running
+          # via FUSE so we don't need libfuse2 on the runner.
+          LISTING=$(curl -sSL https://files.openscad.org/snapshots/)
+          LATEST=$(printf '%s\n' "$LISTING" \
+            | grep -oE 'OpenSCAD-[0-9.]+\.ai[0-9]+-x86_64\.AppImage' \
+            | sort -u | tail -1)
+          test -n "$LATEST" || { echo "No snapshot AppImage found"; exit 1; }
+          echo "Using $LATEST"
+          wget -q "https://files.openscad.org/snapshots/${LATEST}" -O /tmp/openscad.AppImage
+          chmod +x /tmp/openscad.AppImage
+          ( cd /tmp && ./openscad.AppImage --appimage-extract >/dev/null )
+          sudo mv /tmp/squashfs-root /opt/openscad
+          sudo ln -sf /opt/openscad/AppRun /usr/local/bin/openscad
+          openscad --version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
